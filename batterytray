@@ -6,8 +6,8 @@ import os
 class Battery():
     def __init__(self, id):
         self.id = id
-        self.max = self.get("energy_full")
-        self.orig_max = self.get("energy_full_design")
+        self.max = self.get("charge_full")
+        self.orig_max = self.get("charge_full_design")
         self.update()
         GLib.timeout_add_seconds (1, self.update)
 
@@ -16,7 +16,7 @@ class Battery():
           return f.readline().strip()
 
     def update (self):
-        self.now = self.get("energy_now")
+        self.now = self.get("charge_now")
         self.state = self.get("status") == "Charging"
         return True
 
