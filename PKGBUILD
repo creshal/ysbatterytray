@@ -1,5 +1,5 @@
 pkgname=batterytray
-pkgver=2.1
+pkgver=2.2
 pkgrel=1
 pkgdesc="Battery information via system tray"
 arch=('any')

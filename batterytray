@@ -9,7 +9,7 @@ class Battery():
         self.max = self.get("charge_full")
         self.orig_max = self.get("charge_full_design")
         self.update()
-        GLib.timeout_add_seconds (1, self.update)
+        #GLib.timeout_add_seconds (5, self.update)
 
     def get (self, attr):
         with open (os.path.join ("/sys/class/power_supply",self.id,attr)) as f:
@@ -32,12 +32,12 @@ class TrayIcon():
         self.icon.embedded = True;
         self.update_icon()
         self.icon.set_visible(True)
-        GLib.timeout_add_seconds(5, self.update_icon, "acpi")
+        GLib.timeout_add_seconds(5, self.update_icon)
 
     def main(self):
         Gtk.main()
 
-    def update_icon(self,command="acpi"):
+    def update_icon(self):
         self.batteries = {}
         for entry in os.listdir ("/sys/class/power_supply"):
           if "BAT" in entry:
