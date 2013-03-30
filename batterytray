@@ -11,38 +11,65 @@ class Battery():
     def __init__(self, id):
         self.id = id
         self.voltage = self.get("voltage_now") / 1000
+        self.status = self.gets("status")
+        self.state = self.status == "Charging"
         try:
           self.max = self.get("energy_full") * 1000 / self.voltage
           self.orig_max = self.get("energy_full_design") * 1000 / self.voltage
           self.now = self.get("energy_now") * 1000 / self.voltage
-          self.state = self.get("status") == "Charging"
           self.rate = self.get("power_now") / self.voltage
         except:
           self.max = self.get("charge_full") / 1000
           self.orig_max = self.get("charge_full_design") / 1000
           self.now = self.get("charge_now") / 1000
-          self.state = self.get("status") == "Charging"
           self.rate = self.get("current_now") / 1000
+        try:
+          assert (os.path.exists (os.path.join ("/sys/devices/platform/smapi/",self.id)))
+          assert (self.tpget ("installed") is 1)
+          self.tp = True
+          self.dom = self.tpgets ("manufacture_date")
+          self.temp = self.tpget ("temperature")/1000
+          self.range = "%i%% – %i%%" % (self.tpget ("start_charge_thresh"),self.tpget("stop_charge_thresh"))
+          self.inhibit = self.tpget ("inhibit_charge_minutes")
+          self.forced = self.tpget ("force_discharge") is 1
+        except Exception as e:
+          self.tp = False
 
-    def get (self, attr):
-        with open (os.path.join ("/sys/class/power_supply",self.id,attr)) as f:
-          line = f.readline().strip()
-          return line if attr == "status" else int(line)
+    def get (self, attr):    return int(self.gets   (attr))
+    def tpget (self, attr):  return int(self.tpgets (attr))
+    def gets (self, attr):   return self._get (os.path.join ("/sys/class/power_supply",      self.id,attr))
+    def tpgets (self, attr): return self._get (os.path.join ("/sys/devices/platform/smapi/", self.id,attr))
+
+    def _get (self, path):
+      line = ""
+      with open (path) as f: line = "\n".join(f.readlines()).strip()
+      return line
 
     def get_percent (self):
-        return int(self.now) / float(self.max)
+      try:    return int(self.now) / float(self.max)
+      except: return 0
 
     def get_designpercent (self):
-        return int(self.now) / float(self.orig_max)
+      try:    return int(self.now) / float(self.orig_max)
+      except: return 0
 
     def ttl (self):
-        if self.state: ttl = 3600 * (self.max - self.now) / self.rate
-        else: ttl =  3600 * self.now / self.rate
-
+      try:
+        if self.tp: ttl = self.tpget ("remaining_running_time") * 60
+        else:
+          if self.state: ttl = 3600 * (self.max - self.now) / self.rate
+          else: ttl =  3600 * self.now / self.rate
         return time.strftime ("%T", time.gmtime(ttl))
+      except: return "(unknown)"
 
     def __str__ (self):
-        return "Battery %s: %s %.2f%% (%.2f%% of design capacity), %s remaining" % (self.id, "Charging" if self.state else "Discharging", self.get_percent()*100, self.get_designpercent()*100, self.ttl())
+        retval = "Battery %s: %s %.2f%% (%.2f%% of design capacity), %s remaining" % (self.id, self.status, self.get_percent()*100, self.get_designpercent()*100, self.ttl())
+        retval +="\n\t%s %s (S/N %s), %i mAh / %i Wh" % (self.gets("manufacturer"), self.gets("model_name"), self.gets("serial_number"), self.max, int (self.max*self.voltage/1000000.0))
+        if self.tp:
+          retval += "\n\tTemperature: %i°C\n\tCharge range: %s\n\tDate of manufacture: %s" %(self.temp,self.range,self.dom)
+          if self.inhibit > 0: retval += "\n\tCharging inhibited for %i minutes" % self.inhibit
+          if self.forced:      retval += "\n\tForced discharge active"
+        return retval
 
 class TrayIcon():
     def __init__(self):
