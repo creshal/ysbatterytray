@@ -99,6 +99,8 @@ class TrayIcon():
 
         status = 0
         charging = False
+        ac = False
+        with open ("/sys/class/power_supply/AC/online") as f: ac = int (f.readline().strip()) is 1
         for battery in self.batteries:
           status += self.batteries[battery].get_percent()
           charging |= self.batteries[battery].state
@@ -110,7 +112,8 @@ class TrayIcon():
 
         self.icon.set_tooltip_text ("\n".join([str(self.batteries[battery]) for battery in self.batteries]))
         if status != self.last_state:
-          self.icon.set_from_file("/usr/share/pixmaps/battery/battery-"+state+("-full.png" if status==1 else "-loading.png" if charging else ".png"))
+          iconname = "/usr/share/pixmaps/battery/battery-" + "-charging" if charging else ""
+          self.icon.set_from_file(iconname + "-ac.png" if ac else ".png")
         self.last_state = status
 
         return True
