@@ -110,6 +110,9 @@ class TrayIcon():
         elif status < 0.75: state = "high"
         else:               state = "full"
 
+        elif status < 0.1:
+          os.system ("notify-send 'Battery low!' -i battery-caution")
+
         self.icon.set_tooltip_text ("\n".join([str(self.batteries[battery]) for battery in self.batteries]))
         if status != self.last_state:
           iconname = "/usr/share/pixmaps/battery/battery-"+state+ ("-charging" if charging else "")
