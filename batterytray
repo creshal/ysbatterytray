@@ -14,9 +14,9 @@ class Battery():
         self.status = self.gets("status")
         self.state = self.status == "Charging"
         try:
-          self.max = self.get("energy_full") * 1000 / self.voltage
-          self.orig_max = self.get("energy_full_design") * 1000 / self.voltage
-          self.now = self.get("energy_now") * 1000 / self.voltage
+          self.max = self.get("energy_full")/ self.voltage
+          self.orig_max = self.get("energy_full_design")/ self.voltage
+          self.now = self.get("energy_now")/ self.voltage
           self.rate = self.get("power_now") / self.voltage
         except:
           self.max = self.get("charge_full") / 1000
