@@ -1,5 +1,5 @@
 pkgname=batterytray
-pkgver=2.4.3.1
+pkgver=2.5
 pkgrel=1
 pkgdesc="Battery information via system tray"
 arch=('any')
@@ -7,7 +7,7 @@ url="http://dev.yaki-syndicate.de/"
 license=('GPL')
 depends=('python-gobject' 'libnotify')
 source=("http://dev.yaki-syndicate.de/git/cgit.cgi/${pkgname}/snapshot/${pkgname}-${pkgver}.tar.bz2")
-md5sums=("77bef8ccf9893e40322a3cfc66d5bb12")
+md5sums=("d41d8cd98f00b204e9800998ecf8427e")
 build () {
   cd "$srcdir"/$pkgname-$pkgver
   mkdir -p ${pkgdir}/usr/share/pixmaps/battery/
