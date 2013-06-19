@@ -7,7 +7,7 @@ url="http://dev.yaki-syndicate.de/"
 license=('GPL')
 depends=('python-gobject' 'libnotify')
 source=("http://dev.yaki-syndicate.de/git/cgit.cgi/${pkgname}/snapshot/${pkgname}-${pkgver}.tar.bz2")
-md5sums=("d41d8cd98f00b204e9800998ecf8427e")
+md5sums=("980a9bfe22429602fd1f11cbbb2282ae")
 build () {
   cd "$srcdir"/$pkgname-$pkgver
   mkdir -p ${pkgdir}/usr/share/pixmaps/battery/
