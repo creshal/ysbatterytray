@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-
 from gi.repository import Gtk, GLib
 import os,time
 
@@ -35,22 +34,27 @@ class Battery():
         except Exception as e:
           self.tp = False
 
-    def get (self, attr):    return int(self.gets   (attr))
-    def tpget (self, attr):  return int(self.tpgets (attr))
+    def get (self, attr):
+      try:    return int(self.gets   (attr))
+      except: return 0
+    def tpget (self, attr):
+      try:    return int(self.tpgets (attr))
+      except: return 0
+
     def gets (self, attr):   return self._get (os.path.join ("/sys/class/power_supply",      self.id,attr))
     def tpgets (self, attr): return self._get (os.path.join ("/sys/devices/platform/smapi/", self.id,attr))
 
     def _get (self, path):
-      line = ""
-      with open (path) as f: line = "\n".join(f.readlines()).strip()
-      return line
+      try:
+        with open (path) as f: return "\n".join(f.readlines()).strip()
+      except: return ""
 
     def get_percent (self):
-      try:    return int(self.now) / float(self.max)
+      try:    return self.now / self.max
       except: return 0
 
     def get_designpercent (self):
-      try:    return int(self.now) / float(self.orig_max)
+      try:    return self.now / self.orig_max
       except: return 0
 
     def ttl (self):
