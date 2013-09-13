@@ -12,7 +12,7 @@ class Battery():
         self.voltage = self.get("voltage_now") / 1000
         self.status = self.gets("status")
         self.state = self.status == "Charging"
-        if not self.state:
+        if os.path.exists (os.path.join("/sys/class/power_supply",self.id,"energy_full")):
           self.max = self.get("energy_full")/ self.voltage
           self.orig_max = self.get("energy_full_design")/ self.voltage
           self.now = self.get("energy_now")/ self.voltage
