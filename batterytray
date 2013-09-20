@@ -78,17 +78,24 @@ class Battery():
 class TrayIcon():
     def __init__(self):
         self.icon = Gtk.StatusIcon()
-        self.icon.embedded = True;
-        self.last_state = "";
+        self.update_interval = 5
+        self.icon.embedded = True
+        self.last_state = ""
+        self.is_online = self.online()
+        self.offline_time = self.suspend_time = 0
+        self.last_check_time = time.time ()
         self.update_icon()
         self.icon.set_visible(True)
-        GLib.timeout_add_seconds(5, self.update_icon)
+        GLib.timeout_add_seconds(self.update_interval, self.update_icon)
 
     def destroy (self, widget, data=None):
         Gtk.main_quit()
 
     def main(self):
         Gtk.main()
+
+    def online (self):
+        with open ("/sys/class/power_supply/AC/online") as f: return int (f.readline().strip()) is 1
 
     def update_icon(self):
         self.batteries = {}
@@ -101,10 +108,25 @@ class TrayIcon():
           self.icon.set_tooltip_text("No battery found.")
           return True
 
-        status = 0
-        charging = False
-        ac = False
-        with open ("/sys/class/power_supply/AC/online") as f: ac = int (f.readline().strip()) is 1
+        online_stats = ''
+        status, charging, self.is_online, curtime = 0, False, self.online(), time.time()
+
+        if not self.is_online:
+          self.offline_time += self.update_interval #don't rely on timestamps as it cannot factor in suspends
+          timediff = curtime - self.last_check_time
+          if timediff > (self.update_interval*1.5): #allow some overhead, assume suspend if longer delay
+            print ("%i %i %i %i" % (curtime, self.last_check_time, timediff, self.update_interval*1.5))
+            self.suspend_time += timediff
+
+          if self.offline_time <= self.update_interval: online_stats = '\n\nOn battery for an undetermined time span.'
+          else:
+            online_stats = time.strftime('\n\nOn battery for at least %T.', time.gmtime(self.offline_time))
+            if self.suspend_time: online_stats += time.strftime('\n\tAdditionally, suspended for ca. %T.', time.gmtime(self.suspend_time))
+        else:
+          self.offline_time = self.suspend_time = 0
+        self.last_check_time = curtime
+
+
         for battery in self.batteries:
           status += self.batteries[battery].get_percent()
           charging |= self.batteries[battery].state
@@ -117,10 +139,10 @@ class TrayIcon():
         if status < 0.1:
           os.system ("notify-send 'Battery low!' -i battery-caution")
 
-        self.icon.set_tooltip_text ("\n".join([str(self.batteries[battery]) for battery in self.batteries]))
+        self.icon.set_tooltip_text ("\n".join([str(self.batteries[battery]) for battery in self.batteries]) + online_stats)
         if status != self.last_state:
           iconname = "/usr/share/pixmaps/battery/battery-"+state+ ("-charging" if charging else "")
-          iconname += "-ac.png" if ac else ".png"
+          iconname += "-ac.png" if self.is_online else ".png"
           self.icon.set_from_file(iconname)
         self.last_state = status
 
