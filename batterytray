@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-
 from gi.repository import Gtk, GLib
 import os,time
 
@@ -13,7 +12,7 @@ class Battery():
         self.voltage = self.get("voltage_now") / 1000
         self.status = self.gets("status")
         self.state = self.status == "Charging"
-        if not self.state:
+        if os.path.exists (os.path.join("/sys/class/power_supply",self.id,"energy_full")):
           self.max = self.get("energy_full")/ self.voltage
           self.orig_max = self.get("energy_full_design")/ self.voltage
           self.now = self.get("energy_now")/ self.voltage
@@ -35,22 +34,27 @@ class Battery():
         except Exception as e:
           self.tp = False
 
-    def get (self, attr):    return int(self.gets   (attr))
-    def tpget (self, attr):  return int(self.tpgets (attr))
+    def get (self, attr):
+      try:    return int(self.gets   (attr))
+      except: return 0
+    def tpget (self, attr):
+      try:    return int(self.tpgets (attr))
+      except: return 0
+
     def gets (self, attr):   return self._get (os.path.join ("/sys/class/power_supply",      self.id,attr))
     def tpgets (self, attr): return self._get (os.path.join ("/sys/devices/platform/smapi/", self.id,attr))
 
     def _get (self, path):
-      line = ""
-      with open (path) as f: line = "\n".join(f.readlines()).strip()
-      return line
+      try:
+        with open (path) as f: return "\n".join(f.readlines()).strip()
+      except: return ""
 
     def get_percent (self):
-      try:    return int(self.now) / float(self.max)
+      try:    return self.now / self.max
       except: return 0
 
     def get_designpercent (self):
-      try:    return int(self.now) / float(self.orig_max)
+      try:    return self.now / self.orig_max
       except: return 0
 
     def ttl (self):
@@ -62,9 +66,12 @@ class Battery():
         return time.strftime ("%T", time.gmtime(ttl))
       except: return "(unknown)"
 
+    def shortinfo (self):
+      return "BAT%s: %s %.2f%%" % (self.id,self.status, self.get_percent()*100)
+
     def __str__ (self):
-        retval = "Battery %s: %s %.2f%% (%.2f%% of design capacity), %s remaining" % (self.id, self.status, self.get_percent()*100, self.get_designpercent()*100, self.ttl())
-        retval +="\n\t%s %s (S/N %s), %i mAh / %i Wh" % (self.gets("manufacturer"), self.gets("model_name"), self.gets("serial_number"), self.max, int (self.max*self.voltage/1000000.0))
+        retval = "Battery %s:\n\t%s %.2f%%\n\t%.2f%% design\n\t%s remaining" % (self.id, self.status, self.get_percent()*100, self.get_designpercent()*100, self.ttl())
+        retval +="\n\t%s %s (S/N %s)\n\t%i mAh / %i Wh" % (self.gets("manufacturer"), self.gets("model_name"), self.gets("serial_number"), self.max, int (self.max*self.voltage/1000000.0))
         if self.tp:
           retval += "\n\tTemperature: %i°C\n\tCharge range: %s\n\tDate of manufacture: %s" %(self.temp,self.range,self.dom)
           if self.inhibit > 0: retval += "\n\tCharging inhibited for %i minutes" % self.inhibit
@@ -74,17 +81,29 @@ class Battery():
 class TrayIcon():
     def __init__(self):
         self.icon = Gtk.StatusIcon()
-        self.icon.embedded = True;
-        self.last_state = "";
-        self.update_icon()
+        self.update_interval = 5
+        self.icon.embedded = True
+        self.last_state = ""
+        self.is_online = self.online()
+        self.offline_time = self.suspend_time = 0
+        self.last_check_time = time.time ()
         self.icon.set_visible(True)
-        GLib.timeout_add_seconds(5, self.update_icon)
+        self.icon.connect ('popup-menu', self.menu)
+        self.ctx = Gtk.Menu ()
+        GLib.timeout_add_seconds(self.update_interval, self.update_icon)
+        self.update_icon()
 
     def destroy (self, widget, data=None):
         Gtk.main_quit()
 
     def main(self):
         Gtk.main()
+
+    def online (self):
+        with open ("/sys/class/power_supply/AC/online") as f: return int (f.readline().strip()) is 1
+
+    def menu (self, icon, button, time):
+      self.ctx.popup (None, None, self.icon.position_menu, icon, button, time)
 
     def update_icon(self):
         self.batteries = {}
@@ -97,10 +116,25 @@ class TrayIcon():
           self.icon.set_tooltip_text("No battery found.")
           return True
 
-        status = 0
-        charging = False
-        ac = False
-        with open ("/sys/class/power_supply/AC/online") as f: ac = int (f.readline().strip()) is 1
+        online_stats = ''
+        status, charging, self.is_online, curtime = 0, False, self.online(), time.time()
+
+        if not self.is_online:
+          self.offline_time += self.update_interval #don't rely on timestamps as it cannot factor in suspends
+          timediff = curtime - self.last_check_time
+          if timediff > (self.update_interval*1.5): #allow some overhead, assume suspend if longer delay
+            print ("%i %i %i %i" % (curtime, self.last_check_time, timediff, self.update_interval*1.5))
+            self.suspend_time += timediff
+
+          if self.offline_time <= self.update_interval: online_stats = '\n\nOn battery for an undetermined time span.'
+          else:
+            online_stats = time.strftime('\n\nOn battery for %T', time.gmtime(self.offline_time))
+            if self.suspend_time: online_stats += time.strftime('\n\tSuspended for ca. %T', time.gmtime(self.suspend_time))
+        else:
+          self.offline_time = self.suspend_time = 0
+        self.last_check_time = curtime
+
+
         for battery in self.batteries:
           status += self.batteries[battery].get_percent()
           charging |= self.batteries[battery].state
@@ -113,11 +147,10 @@ class TrayIcon():
         if status < 0.1:
           os.system ("notify-send 'Battery low!' -i battery-caution")
 
-        self.icon.set_tooltip_text ("\n".join([str(self.batteries[battery]) for battery in self.batteries]))
-        print ("\n".join([str(self.batteries[battery]) for battery in self.batteries]))
+        self.icon.set_tooltip_markup ("\n".join([self.batteries[battery].shortinfo() for battery in self.batteries]))
         if status != self.last_state:
           iconname = "/usr/share/pixmaps/battery/battery-"+state+ ("-charging" if charging else "")
-          iconname += "-ac.png" if ac else ".png"
+          iconname += "-ac.png" if self.is_online else ".png"
           self.icon.set_from_file(iconname)
         self.last_state = status
 
