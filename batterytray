@@ -67,11 +67,11 @@ class Battery():
       except: return "(unknown)"
 
     def __str__ (self):
-        retval = "Battery %s: %s %.2f%% (%.2f%% of design capacity), %s remaining" % (self.id, self.status, self.get_percent()*100, self.get_designpercent()*100, self.ttl())
-        retval +="\n\t%s %s (S/N %s), %i mAh / %i Wh" % (self.gets("manufacturer"), self.gets("model_name"), self.gets("serial_number"), self.max, int (self.max*self.voltage/1000000.0))
+        retval = "Battery %s:\n\t%s %.2f%%\n\t%.2f%% design capacity\n\t%s remaining" % (self.id, self.status, self.get_percent()*100, self.get_designpercent()*100, self.ttl())
+        retval +="\n\t%s %s (S/N %s)\n\t%i mAh / %i Wh" % (self.gets("manufacturer"), self.gets("model_name"), self.gets("serial_number"), self.max, int (self.max*self.voltage/1000000.0))
         if self.tp:
-          retval += "\n\tTemperature: %i°C\n\tCharge range: %s\n\tDate of manufacture: %s" %(self.temp,self.range,self.dom)
-          if self.inhibit > 0: retval += "\n\tCharging inhibited for %i minutes" % self.inhibit
+          retval += "\n\t%i°C\n\tCharge range: %s\n\tManufactured: %s"%(self.temp,self.range,self.dom)
+          if self.inhibit > 0: retval += "\n\tCharge inhibited for %i min" % self.inhibit
           if self.forced:      retval += "\n\tForced discharge active"
         return retval
 
@@ -118,10 +118,10 @@ class TrayIcon():
             print ("%i %i %i %i" % (curtime, self.last_check_time, timediff, self.update_interval*1.5))
             self.suspend_time += timediff
 
-          if self.offline_time <= self.update_interval: online_stats = '\n\nOn battery for an undetermined time span.'
+          if self.offline_time <= self.update_interval: online_stats = '\n\nOn battery, unknown duration.'
           else:
-            online_stats = time.strftime('\n\nOn battery for at least %T.', time.gmtime(self.offline_time))
-            if self.suspend_time: online_stats += time.strftime('\n\tAdditionally, suspended for ca. %T.', time.gmtime(self.suspend_time))
+            online_stats = time.strftime('\n\nOn battery for ca. %T.', time.gmtime(self.offline_time))
+            if self.suspend_time: online_stats += time.strftime('\n\tSuspended for ca. %T.', time.gmtime(self.suspend_time))
         else:
           self.offline_time = self.suspend_time = 0
         self.last_check_time = curtime
@@ -139,7 +139,9 @@ class TrayIcon():
         if status < 0.1:
           os.system ("notify-send 'Battery low!' -i battery-caution")
 
-        self.icon.set_tooltip_text ("\n".join([str(self.batteries[battery]) for battery in self.batteries]) + online_stats)
+        tooltip_text = "\n".join([str(self.batteries[battery]) for battery in self.batteries])+online_stats
+        self.icon.set_tooltip_text (tooltip_text)
+
         if status != self.last_state:
           iconname = "/usr/share/pixmaps/battery/battery-"+state+ ("-charging" if charging else "")
           iconname += "-ac.png" if self.is_online else ".png"
