@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 from gi.repository import Gtk, GLib
-import os,time
+import os,time,glob
 
 #Hack for pygtk ignoring ^C
 import signal
@@ -95,7 +95,7 @@ class TrayIcon():
         Gtk.main()
 
     def online (self):
-        with open ("/sys/class/power_supply/AC/online") as f: return int (f.readline().strip()) is 1
+        return any (map (lambda x: int(open(x).read().strip())==1, glob.glob ("/sys/class/power_supply/*/online")))
 
     def update_icon(self):
         self.batteries = {}
