@@ -136,7 +136,7 @@ class TrayIcon():
         elif status < 0.75: state = "high"
         else:               state = "full"
 
-        if status < 0.1:
+        if status < 0.1 and not self.is_online:
           os.system ("notify-send 'Battery low!' -i battery-caution")
 
         tooltip_text = "\n".join([str(self.batteries[battery]) for battery in self.batteries])+online_stats
