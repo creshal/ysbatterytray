@@ -126,20 +126,25 @@ class TrayIcon():
           self.offline_time = self.suspend_time = 0
         self.last_check_time = curtime
 
-
+        now = rate = 0
         for battery in self.batteries:
-          status += self.batteries[battery].get_percent()
+          status   += self.batteries[battery].get_percent()
           charging |= self.batteries[battery].state
+          now      += self.batteries[battery].now
+          rate     += self.batteries[battery].rate
+        try:    ttl = time.strftime ("%T", time.gmtime(3600 * now / rate))
+        except: ttl = '(unknown)'
         status /= len(self.batteries)
         if status < 0.25:   state = "crit"
         elif status < 0.5:  state = "low"
         elif status < 0.75: state = "high"
         else:               state = "full"
+        totals = "\nTotal: %.0f%%, %s remaining" % (status*100, ttl)
 
         if status < 0.1 and not self.is_online:
           os.system ("notify-send 'Battery low!' -i battery-caution")
 
-        tooltip_text = "\n".join([str(self.batteries[battery]) for battery in self.batteries])+online_stats
+        tooltip_text = "\n".join([str(self.batteries[battery]) for battery in self.batteries])+online_stats+totals
         self.icon.set_tooltip_text (tooltip_text)
 
         if status != self.last_state:
